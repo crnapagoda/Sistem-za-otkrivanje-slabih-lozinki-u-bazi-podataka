@@ -22,6 +22,7 @@ import os
 import re
 import datetime
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Funkcija za listanje dostupnih baza lozinki iz foldera
@@ -130,34 +131,27 @@ def check_compromised_passwords(df, compromised_file):
     print("\nLozinke pronađene u kompromitovanoj bazi:")
     print(df[df['compromised']])
 
-# Funkcija za vizuelizaciju analize lozinki
-def visualize_password_analysis(df):
-    total_passwords = len(df)
-    weak_passwords = len(df[df['is_strong'] == False])
-    strong_passwords = total_passwords - weak_passwords
+# Funkcija za vizualizaciju dužine i kompleksnosti lozinki
+def visualize_password_analysis(passwords):
+    # Vizualizacija dužine lozinki
+    lengths = passwords['password'].apply(len)
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    sns.histplot(lengths, kde=True)
+    plt.title('Distribucija dužine lozinki')
+    plt.xlabel('Dužina lozinke')
+    plt.ylabel('Frekvencija')
 
-    # Pie chart za odnos jakih i slabih lozinki
-    labels = ['Slabe lozinke', 'Jake lozinke']
-    sizes = [weak_passwords, strong_passwords]
-    colors = ['#FF9999', '#99FF99']
-    explode = (0.1, 0)  
+    # Vizualizacija kompleksnosti lozinki
+    complexity = passwords['password'].apply(check_complexity)
+    plt.subplot(1, 2, 2)
+    sns.countplot(x=complexity)
+    plt.title('Kompleksnost lozinki')
+    plt.xlabel('Kompleksna lozinka')
+    plt.ylabel('Broj lozinki')
 
-    plt.figure(figsize=(8, 6))
-    plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors, explode=explode)
-    plt.title("Odnos jakih i slabih lozinki")
+    plt.tight_layout()
     plt.show()
-
-    # Bar chart za duplikate lozinki
-    duplicates = df['password'].value_counts()
-    duplicates = duplicates[duplicates > 1]
-
-    if not duplicates.empty:
-        plt.figure(figsize=(8, 6))
-        duplicates.plot(kind='bar', color='#FFCC99')
-        plt.title("Duplirane lozinke i njihova učestalost")
-        plt.xlabel("Lozinke")
-        plt.ylabel("Broj pojavljivanja")
-        plt.show()
 
 # Funkcija za ocenjivanje lozinke
 def password_score(password):
