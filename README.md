@@ -6,18 +6,20 @@ Projekat je osmišljen kao alat za analizu i procenu sigurnosti lozinki unutar b
 
 
 ## Funkcionalnosti
-
-<ul>Analiza i ocenjivanje lozinki:
+Analiza i ocenjivanje lozinki:
+<ul>
     <li>Provera dužine</li>
     <li>Provera kompleksnosti (kombinacija malih i velikih slova, brojeva i specijalnih karaktera)</li>
     <li>Upoređivanje sa listom kompromitovanih lozinki (rockyou.txt)</li>
     <li>Na osnovu kriterijuma lozinka dobija ocenu od 5 do 10</li>
 </ul>
-<ul>Izveštaji:
+Izveštaji:
+<ul>
     <li>Generisanje Excel fajlova sa detaljnim informacijama o sigurnosti lozinki</li>
     <li>Detekcija duplikata i izrada statistike jakih i slabih lozinki</li>
 </ul>
-<ul>Predlozi za unapređenje:
+Predlozi za unapređenje:
+<ul>
     <li>Automatsko generisanje preporuka za jačanje lozinki</li>
 </ul>
 
