@@ -22,8 +22,9 @@ This project is designed as a tool for analyzing and assessing the security of p
 ## Installation
 
 To run this project, ensure you have Python installed along with the required libraries. You can install the necessary libraries using pip:
-bash
+```bash
 pip install pandas seaborn matplotlib PyQt6
+```
 
 
 ## Usage
