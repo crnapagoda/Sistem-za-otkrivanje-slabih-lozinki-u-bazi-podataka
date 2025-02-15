@@ -1,23 +1,4 @@
-"""
-Ovaj Python kod predstavlja sistem za analizu lozinki, osmišljen da detektuje slabe lozinke, ocenjuje jačinu lozinke, generiše predloge za unapređenje, identifikuje duplikate, proveri kompromitovane lozinke i vizualizuje rezultate analize, kao i da čuva izveštaj u Excel fajlu.
-
-Funkcionalnosti:
-- Učitavanje baza lozinki iz CSV fajlova.
-- Provera jačine lozinki na osnovu dužine, kompleksnosti i prisustva specijalnih karaktera.
-- Detekcija dupliranih lozinki i provera kompromitovanih lozinki u odnosu na poznatu bazu rockyou.txt.
-- Generisanje detaljnih izveštaja u Excel formatu.
-- Vizuelni prikaz podataka o jakim i slabim lozinkama.
-- Generisanje predloga za poboljšanje slabih lozinki.
-- Procenjivanje lozinki na osnovu unapred definisanih kriterijuma.
-
-Tehnologije i biblioteke:
-- os, re i datetime za rad sa datotekama, regularne izraze i rad sa vremenom.
-- pandas za manipulaciju i analizu podataka.
-- matplotlib.pyplot za vizualizaciju rezultata.
-
-Program koristi interaktivni pristup kroz meni kako bi omogućio korisniku da bira opcije za analizu i generisanje izveštaja.
-"""
-
+import sys
 import os
 import re
 import datetime
@@ -25,219 +6,186 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Funkcija za listanje dostupnih baza lozinki iz foldera
-def list_password_files(folder_path):
-    try:
-        files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
-        if not files:
-            print("Nema dostupnih baza lozinki u folderu.")
-            return []
-        print("\nDostupne baze lozinki:")
-        for i, file in enumerate(files, 1):
-            print(f"{i}. {file}")
-        return files
-    except FileNotFoundError:
-        print(f"Folder '{folder_path}' ne postoji.")
-        return []
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QLabel, QPushButton, QFileDialog, QVBoxLayout,
+    QTableWidget, QTableWidgetItem, QTextEdit
+)
+from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-# Funkcija za izbor baze lozinki koje sa nalaze u folderu
-def choose_password_file(files):
-    while True:
-        try:
-            choice = int(input("\nUnesite broj baze lozinki za analizu: ")) - 1
-            if 0 <= choice < len(files):
-                return files[choice]
-            else:
-                print("Uneli ste nevažeći broj. Pokušajte ponovo.")
-        except ValueError:
-            print("Molimo unesite broj.")
 
-# Funkcija za učitavanje lozinki iz CSV fajla
-def load_passwords(file_path):
-    df = pd.read_csv(file_path)
-    print("Učitane lozinke:")
-    print(df)
-    return df
-
-# Funkcija za proveru dužine lozinke
+# Funkcije za analizu lozinki (same as before)
 def check_length(password, min_length=8):
     return len(password) >= min_length
 
-# Funkcija za proveru kompleksnosti lozinke
 def check_complexity(password):
-    if (re.search(r'[a-z]', password) and
-        re.search(r'[A-Z]', password) and
-        re.search(r'\d', password) and
-        re.search(r'[!@#$%^&*(),.?":{}|<>]', password)):
-        return True
-    return False
+    return bool(re.search(r'[a-z]', password) and
+                re.search(r'[A-Z]', password) and
+                re.search(r'\d', password) and
+                re.search(r'[!@#$%^&*(),.?":{}|<>]', password))
 
-# Funkcija za analizu svih lozinki u tabeli
+def password_score(password):
+    score = 5
+    if len(password) >= 12: score += 1
+    if re.search(r'[a-z]', password): score += 1
+    if re.search(r'[A-Z]', password): score += 1
+    if re.search(r'\d', password): score += 1
+    if re.search(r'[!@#$%^&*(),.?":{}|<>]', password): score += 1
+    common_patterns = ['123456', 'password', 'qwerty', 'admin']
+    if any(pattern in password.lower() for pattern in common_patterns): score -= 2
+    return max(5, min(score, 10))
+
 def analyze_passwords(df):
-    df['length_check'] = df['password'].apply(lambda pwd: check_length(pwd))
-    df['complexity_check'] = df['password'].apply(lambda pwd: check_complexity(pwd))
+    df['length_check'] = df['password'].apply(check_length)
+    df['complexity_check'] = df['password'].apply(check_complexity)
     df['is_strong'] = df['length_check'] & df['complexity_check']
+    df['score'] = df['password'].apply(password_score)
     return df
 
-# Funkcija za generisanje predloga unapređenja lozinki
-def generate_password_suggestions(password):
-    suggestions = []
-    if not check_length(password):
-        suggestions.append("Povećajte dužinu lozinke na najmanje 8 karaktera.")
-    if not re.search(r'[a-z]', password):
-        suggestions.append("Dodajte mala slova.")
-    if not re.search(r'[A-Z]', password):
-        suggestions.append("Dodajte velika slova.")
-    if not re.search(r'\d', password):
-        suggestions.append("Dodajte brojeve.")
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        suggestions.append("Dodajte specijalne karaktere.")
-    return " ".join(suggestions)
-
-# Funkcija za dodavanje predloga unapređenja lozinki u DataFrame
-def add_password_suggestions(df):
-    df['suggestions'] = df['password'].apply(generate_password_suggestions)
-    return df    
-
-# Funkcija za generisanje izveštaja 
-def generate_report(df):
-    total_passwords = len(df)
-    weak_passwords = len(df[df['is_strong'] == False])
-    strong_passwords = total_passwords - weak_passwords
-
-    print("\nIzveštaj o lozinkama:")
-    print(f"Ukupno lozinki: {total_passwords}")
-    print(f"Slabe lozinke: {weak_passwords}")
-    print(f"Jake lozinke: {strong_passwords}")
-
-    print("\nDetalji o slabim lozinkama:")
-    print(df[df['is_strong'] == False])
-
-# Funkcija za detekciju duplikata lozinki
-def find_duplicates(df):
-    duplicate_passwords = df['password'].value_counts()
-    duplicates = duplicate_passwords[duplicate_passwords > 1]
-    if not duplicates.empty:
-        print("\nPronađene duplirane lozinke:")
-        print(duplicates)
-    else:
-        print("\nNema dupliranih lozinki.")
-
-# Funkcija za proveru kompromitovanih lozinki
-def check_compromised_passwords(df, compromised_file):
-    with open(compromised_file, 'r', encoding='latin-1') as file:
-        compromised_passwords = set(file.read().splitlines())
-    df['compromised'] = df['password'].apply(lambda pwd: pwd in compromised_passwords)
-    print("\nLozinke pronađene u kompromitovanoj bazi:")
-    print(df[df['compromised']])
-
-# Funkcija za vizualizaciju dužine i kompleksnosti lozinki
-def visualize_password_analysis(passwords):
-    # Vizualizacija dužine lozinki
-    lengths = passwords['password'].apply(len)
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    sns.histplot(lengths, kde=True)
-    plt.title('Distribucija dužine lozinki')
-    plt.xlabel('Dužina lozinke')
-    plt.ylabel('Frekvencija')
-
-    # Vizualizacija kompleksnosti lozinki
-    complexity = passwords['password'].apply(check_complexity)
-    plt.subplot(1, 2, 2)
-    sns.countplot(x=complexity)
-    plt.title('Kompleksnost lozinki')
-    plt.xlabel('Kompleksna lozinka')
-    plt.ylabel('Broj lozinki')
-
-    plt.tight_layout()
-    plt.show()
-
-# Funkcija za ocenjivanje lozinke
-def password_score(password):
-    score = 5  # Početna ocena (5 - lose, 10 - odlično)
-    
-    # Provera dužine lozinke
-    if len(password) >= 12: 
-        score += 1
-
-    # Provera prisustva malih i velikih slova
-    if re.search(r'[a-z]', password): 
-        score += 1
-    if re.search(r'[A-Z]', password): 
-        score += 1
-
-    # Provera prisustva brojeva
-    if re.search(r'\d', password): 
-        score += 1
-
-    # Provera prisustva specijalnih karaktera
-    if re.search(r'[!@#$%^&*(),.?":{}|<>]', password): 
-        score += 1
-
-    # Penalizacija ako lozinka sadrži uobičajene fraze ili šablone
-    common_patterns = ['123456', 'password', 'qwerty', 'iloveyou', 'admin']
-    if any(pattern in password.lower() for pattern in common_patterns): 
-        score -= 2  # Oduzimamo 2 poen
-
-    # Osiguravamo da je rezultat između 5 i 10
-    score = max(5, min(score, 10))
-
-    return score
-
-# Funkcija za cuvanje rezultata u Excel
 def export_to_excel(df, base_filename):
-    required_columns = ['id', 'username', 'password', 'is_strong', 'score', 'compromised', 'suggestions']
-    df_to_export = df[required_columns] if all(col in df.columns for col in required_columns) else df
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f'{base_filename}_izvestaj_{timestamp}.xlsx'
-    df_to_export.to_excel(output_file, index=False)
-    print(f"Izveštaj je sačuvan u fajlu: {output_file}")
+    output_file = f"{base_filename}_izvestaj_{timestamp}.xlsx"
+    df.to_excel(output_file, index=False)
+    return output_file
 
 
-folder_path = 'password_bases'  # Putanja do foldera sa bazama lozinki
-password_files = list_password_files(folder_path)
-selected_file = choose_password_file(password_files)
-file_path = os.path.join(folder_path, selected_file)
-password_data = load_passwords(file_path)
-analyzed_data = analyze_passwords(password_data)
-analyzed_data = add_password_suggestions(analyzed_data)
-generate_report(analyzed_data)
-find_duplicates(password_data)
+# Funkcija za proveru lozinki naspram rockyou.txt
+def check_compromised_passwords(df, rockyou_file):
+    with open(rockyou_file, 'r', encoding='latin-1') as file:
+        compromised_passwords = set(file.read().splitlines())
+    
+    df['is_compromised'] = df['password'].apply(lambda x: x in compromised_passwords)
+    return df
 
-# Provera kompromitovanih lozinki naspram rockzou.txt (baza kompromitovanih lozinki)
-rockyou_file = 'rockyou.txt'  
-check_compromised_passwords(analyzed_data, rockyou_file)
 
-# Dodavanje kolone sa skorom u dataframe
-analyzed_data['score'] = analyzed_data['password'].apply(password_score)
+# GUI aplikacija
+class PasswordAnalyzerApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Analiza Lozinki")
+        self.setGeometry(100, 100, 800, 600)
 
-# Prikaz ažuriranih podataka
-print("\nRezultati sa skorovima lozinki:")
-print(analyzed_data[['id', 'username', 'password', 'score']])
+        # Layout
+        self.layout = QVBoxLayout()
+        
+        self.label = QLabel("Izaberite CSV fajl sa lozinkama:")
+        self.label.setFont(QFont("Arial", 12))
+        self.label.setStyleSheet("color: #2e3d49;")
+        self.layout.addWidget(self.label)
 
-# Ažurirani izveštaj nakon provere
-print("\nAžurirani podaci sa informacijama o kompromitovanim lozinkama:")
-print(analyzed_data[['id', 'username', 'password', 'is_strong', 'score', 'compromised']])
+        self.select_file_button = QPushButton("Odaberi fajl")
+        self.select_file_button.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; padding: 8px 12px;")
+        self.select_file_button.clicked.connect(self.open_file_dialog)
+        self.layout.addWidget(self.select_file_button)
 
-# Meni sa opcijama nakon analize
-def handle_user_choice(analyzed_data, base_filename):
-    while True:
-        print("\nIzaberite opciju:")
-        print("1. Vizuelni prikaz analize lozinki")
-        print("2. Sačuvaj izveštaj u Excel fajl")
-        print("3. Prekid rada")
-        choice = input("\nUnesite broj opcije: ")
+        self.analyze_button = QPushButton("Analiziraj lozinke")
+        self.analyze_button.setEnabled(False)
+        self.analyze_button.setStyleSheet("background-color: #2196F3; color: white; border-radius: 5px; padding: 8px 12px;")
+        self.analyze_button.clicked.connect(self.analyze_passwords)
+        self.layout.addWidget(self.analyze_button)
 
-        if choice == "1":
-            visualize_password_analysis(analyzed_data)
-        elif choice == "2":
-            export_to_excel(analyzed_data, base_filename)
-        elif choice == "3":
-            print("Izlazak iz programa :(")
-            break
-        else:
-            print("Nevažeća opcija. Pokušajte ponovo.")
+        self.result_table = QTableWidget()
+        self.result_table.setStyleSheet("QTableWidget {background-color: #f9f9f9; border: 1px solid #ccc; font-size: 12px;}")
+        self.layout.addWidget(self.result_table)
 
-base_filename = os.path.splitext(selected_file)[0]
-handle_user_choice(analyzed_data, base_filename)
+        self.visualize_button = QPushButton("Prikaži grafičku analizu")
+        self.visualize_button.setEnabled(False)
+        self.visualize_button.setStyleSheet("background-color: #9C27B0; color: white; border-radius: 5px; padding: 8px 12px;")
+        self.visualize_button.clicked.connect(self.visualize_passwords)
+        self.layout.addWidget(self.visualize_button)
+
+        self.export_button = QPushButton("Sačuvaj izveštaj")
+        self.export_button.setEnabled(False)
+        self.export_button.setStyleSheet("background-color: #FF5722; color: white; border-radius: 5px; padding: 8px 12px;")
+        self.export_button.clicked.connect(self.export_report)
+        self.layout.addWidget(self.export_button)
+
+        self.log_output = QTextEdit()
+        self.log_output.setReadOnly(True)
+        self.log_output.setStyleSheet("background-color: #2e3d49; color: white; font-size: 12px; padding: 10px;")
+        self.layout.addWidget(self.log_output)
+
+        self.setLayout(self.layout)
+        self.df = None
+        self.file_path = ""
+
+    def open_file_dialog(self):
+        options = QFileDialog.Option.ReadOnly
+        file_path, _ = QFileDialog.getOpenFileName(self, "Odaberi CSV fajl", "", "CSV Files (*.csv)", options=options)
+        
+        if file_path:
+            self.file_path = file_path
+            self.label.setText(f"Odabrani fajl: {os.path.basename(file_path)}")
+            self.analyze_button.setEnabled(True)
+
+    def analyze_passwords(self):
+        if not self.file_path:
+            return
+        
+        try:
+            self.df = pd.read_csv(self.file_path)
+            if "password" not in self.df.columns:
+                self.log_output.append("Greška: Fajl ne sadrži kolonu 'password'")
+                return
+
+            self.df = analyze_passwords(self.df)
+
+            # Provera lozinki naspram rockyou.txt
+            rockyou_file = 'rockyou.txt'
+            self.df = check_compromised_passwords(self.df, rockyou_file)
+            
+            self.display_results()
+            self.visualize_button.setEnabled(True)
+            self.export_button.setEnabled(True)
+
+        except Exception as e:
+            self.log_output.append(f"Greška pri učitavanju: {str(e)}")
+
+    def display_results(self):
+        self.result_table.clear()
+        self.result_table.setColumnCount(len(self.df.columns))
+        self.result_table.setRowCount(len(self.df))
+        self.result_table.setHorizontalHeaderLabels(self.df.columns)
+
+        for row_idx, row in self.df.iterrows():
+            for col_idx, value in enumerate(row):
+                self.result_table.setItem(row_idx, col_idx, QTableWidgetItem(str(value)))
+
+        self.result_table.resizeColumnsToContents()
+
+    def visualize_passwords(self):
+        if self.df is None:
+            return
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 6))
+
+        lengths = self.df['password'].apply(len)
+        sns.histplot(lengths, kde=True, ax=ax[0])
+        ax[0].set_title('Distribucija dužine lozinki')
+
+        complexity = self.df['complexity_check'].fillna(False).astype(int)
+
+        sns.countplot(x=complexity, ax=ax[1])
+        ax[1].set_title('Kompleksnost lozinki')
+        ax[1].set_xticks([0, 1])
+        ax[1].set_xticklabels(["Slabe", "Jake"])
+
+        self.canvas = FigureCanvas(fig)
+        self.layout.addWidget(self.canvas)
+        self.canvas.draw()
+
+    def export_report(self):
+        if self.df is None:
+            return
+        
+        base_filename = os.path.splitext(os.path.basename(self.file_path))[0]
+        file_path = export_to_excel(self.df, base_filename)
+        self.log_output.append(f"Izveštaj sačuvan: {file_path}")
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = PasswordAnalyzerApp()
+    window.show()
+    sys.exit(app.exec())
